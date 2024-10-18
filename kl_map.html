@@ -1,0 +1,152 @@
+<!-- Steps for running this file properly
+-----------------------------------------------
+1. Locate your the kl_map.html file on cmd
+2. run python -m http.server 8000 - To start a local server
+3. Enter 'http://localhost:8000/kl_map.html' on the browser -->
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaiserslautern Map with Population Info</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Basic layout for map and info box */
+        body {
+            display: flex;
+            margin: 0;
+        }
+
+        #map {
+            height: 100vh;
+            width: 70%; /* 70% width for the map */
+        }
+
+        #info-box {
+            width: 30%; /* 30% width for the info box */
+            padding: 20px;
+            background-color: #f4f4f4;
+            font-family: Arial, sans-serif;
+            border-left: 1px solid #ccc;
+        }
+
+        .info-content {
+            margin-bottom: 20px;
+        }
+
+        #population-chart {
+            width: 100%;
+            height: 200px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Map container -->
+    <div id="map"></div>
+
+    <!-- Info Box -->
+    <div id="info-box">
+        <h2>District Information</h2>
+        <div id="district-name" class="info-content">Click on a district to see information.</div>
+        <div id="district-population" class="info-content"></div>
+        <canvas id="population-chart"></canvas> <!-- Bar chart will be rendered here -->
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+
+    <script>
+        // Initialize the map centered on Kaiserslautern
+        var map = L.map('map').setView([49.4401, 7.7491], 13);
+
+        // Add OSM tile layer to the map
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Fetch the GeoJSON data
+        fetch('Ortsbezirke_mit_Bevölkerungsdaten.geojson')
+            .then(response => response.json())
+            .then(data => {
+                // Styling for the GeoJSON layer
+                function districtStyle(feature) {
+                    return {
+                        fillColor: "#ff7800",
+                        weight: 2,
+                        opacity: 1,
+                        color: "white",
+                        fillOpacity: 0.7
+                    };
+                }
+
+                // Function to handle click events on the district
+                function onEachFeature(feature, layer) {
+                    layer.on({
+                        click: function (e) {
+                            var districtName = feature.properties.ortsbezirk_1;
+                            var totalPopulation = feature.properties.ew_gesamt;
+                            var foreignPopulation = feature.properties.davon_auslaender_gesamt;
+                            var malePopulation = feature.properties.m_gesamt;
+                            var femalePopulation = feature.properties.w_gesamt;
+
+                            // Update the info box with the population information
+                            document.getElementById('district-name').innerHTML = `<b>District: </b>${districtName}`;
+                            document.getElementById('district-population').innerHTML = `
+                                <b>Total Population: </b>${totalPopulation}<br>
+                                <b>Foreign Population: </b>${foreignPopulation}<br>
+                                <b>Male Population: </b>${malePopulation}<br>
+                                <b>Female Population: </b>${femalePopulation}
+                            `;
+
+                            // Update the bar chart with the new population data
+                            updateChart(malePopulation, femalePopulation, foreignPopulation);
+                        }
+                    });
+                }
+
+                // Add the GeoJSON data to the map
+                L.geoJSON(data, {
+                    style: districtStyle,
+                    onEachFeature: onEachFeature
+                }).addTo(map);
+            })
+            .catch(error => console.error("Error loading the GeoJSON file:", error));
+
+        // Initialize the bar chart
+        var ctx = document.getElementById('population-chart').getContext('2d');
+        var populationChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Male', 'Female', 'Foreign'],
+                datasets: [{
+                    label: 'Population',
+                    data: [0, 0, 0], // Initial data, to be updated on district click
+                    backgroundColor: ['rgba(54, 162, 235, 0.2)', 'rgba(255, 99, 132, 0.2)', 'rgba(75, 192, 192, 0.2)'],
+                    borderColor: ['rgba(54, 162, 235, 1)', 'rgba(255, 99, 132, 1)', 'rgba(75, 192, 192, 1)'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // Function to update the bar chart with new data
+        function updateChart(male, female, foreign) {
+            populationChart.data.datasets[0].data = [male, female, foreign];
+            populationChart.update();
+        }
+
+    </script>
+
+</body>
+</html>
